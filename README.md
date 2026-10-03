@@ -1,6 +1,6 @@
 # Timestamps — the generator
 
-[![verify](https://github.com/<BIMBOSTIC>/timestamps-art/actions/workflows/verify.yml/badge.svg)](https://github.com/<BIMBOSTIC>/timestamps-art/actions/workflows/verify.yml)
+[![verify](https://github.com/BIMBOSTIC/timestamps-art/actions/workflows/verify.yml/badge.svg)](https://github.com/BIMBOSTIC/timestamps-art/actions/workflows/verify.yml)
 
 One token per documented event in blockchain history. **1,031 records, every date carrying its source.**
 
@@ -13,7 +13,7 @@ Most NFT collections invent their lore. This one didn't. The dataset was compile
 No installation. No dependencies. Python 3.9 or newer, standard library only.
 
 ```bash
-git clone https://github.com/<BIMBOSTIC>/timestamps-art
+git clone https://github.com/BIMBOSTIC/timestamps-art
 cd timestamps-art
 python3 verify.py
 ```
