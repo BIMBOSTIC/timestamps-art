@@ -1,0 +1,25 @@
+# Regenerates all 1,031 tokens on a clean machine and checks them against
+# CHECKSUMS.txt. Runs on every push, so the badge on the README is a live
+# claim rather than a promise.
+name: verify
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # the generator must be deterministic across versions, not just on one
+        python-version: ["3.9", "3.11", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Regenerate every token and compare
+        run: python3 verify.py
