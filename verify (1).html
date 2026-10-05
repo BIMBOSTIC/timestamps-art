@@ -1,0 +1,404 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Verify a Timestamps record</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Spectral:ital,wght@0,300;0,400;0,600;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one narrow column. A form at the top, then a ledger of checks that
+   fill in from the top down, each carrying its own evidence — closer to a
+   customs declaration than a dashboard. Committed single dark theme, because
+   the collection itself is one. */
+:root{
+  --bg:#07060a; --surface:#100e14; --line:#262230;
+  --fg:#efe9dc; --dim:#8a8578; --faint:#595346;
+  --gold:#f5b63c; --pass:#8ad88a; --fail:#ff6b5c; --wait:#6f6a7d;
+  --serif:'Spectral',Georgia,'Times New Roman',serif;
+  --mono:'IBM Plex Mono',ui-monospace,'DejaVu Sans Mono',Menlo,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{
+  margin:0; background:var(--bg); color:var(--fg);
+  font:400 16px/1.6 var(--serif);
+  padding-block:clamp(32px,6vw,64px); padding-left:20px; padding-right:20px;
+  -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:720px; margin:0 auto; display:flex; flex-direction:column; gap:40px}
+
+/* ── masthead ─────────────────────────────────────────────── */
+header{display:flex; flex-direction:column; gap:14px}
+.mark{display:flex; align-items:center; gap:12px}
+.mark svg{flex:none}
+.mark span{font:500 13px/1 var(--mono); letter-spacing:.42em; color:var(--gold)}
+h1{margin:0; font:300 clamp(28px,5vw,40px)/1.15 var(--serif); text-wrap:balance; letter-spacing:-.01em}
+.lede{margin:0; color:var(--dim); max-width:58ch}
+.lede b{color:var(--fg); font-weight:600}
+
+/* ── the form ─────────────────────────────────────────────── */
+.ask{display:flex; flex-direction:column; gap:12px}
+form{display:flex; gap:10px; flex-wrap:wrap; align-items:stretch}
+label{position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0)}
+input{
+  flex:1 1 200px; min-width:0; background:var(--surface); color:var(--fg);
+  border:1px solid var(--line); border-radius:2px; padding:14px 16px;
+  font:400 17px/1 var(--mono);
+}
+input::placeholder{color:var(--faint)}
+input:focus-visible{outline:2px solid var(--gold); outline-offset:1px; border-color:transparent}
+button{
+  flex:none; background:var(--gold); color:#1a1205; border:0; border-radius:2px;
+  padding:14px 26px; font:500 13px/1 var(--mono); letter-spacing:.18em;
+  cursor:pointer; transition:opacity .15s;
+}
+button:hover{opacity:.86}
+button:disabled{opacity:.4; cursor:default}
+button:focus-visible{outline:2px solid var(--fg); outline-offset:2px}
+.hint{font:400 13px/1.5 var(--mono); color:var(--faint)}
+.hint b{color:var(--dim); font-weight:400}
+
+/* ── record ───────────────────────────────────────────────── */
+.record{border:1px solid var(--line); border-radius:2px; background:var(--surface); overflow:hidden}
+.record-top{
+  display:flex; justify-content:space-between; gap:16px; flex-wrap:wrap;
+  padding:14px 20px; border-bottom:1px solid var(--line);
+  font:500 12px/1 var(--mono); letter-spacing:.24em; color:var(--gold);
+}
+.record-top .era{color:var(--dim)}
+.record-body{padding:22px 20px; display:flex; flex-direction:column; gap:14px}
+.record-body h2{margin:0; font:400 clamp(21px,3.4vw,26px)/1.3 var(--serif); text-wrap:balance}
+.record-body p{margin:0; color:var(--dim); font-size:15px}
+.facts{
+  display:grid; grid-template-columns:repeat(auto-fit,minmax(130px,1fr)); gap:16px;
+  border-top:1px solid var(--line); padding-top:16px;
+}
+.fact{display:flex; flex-direction:column; gap:5px; min-width:0}
+.fact dt{font:400 10px/1 var(--mono); letter-spacing:.24em; color:var(--faint)}
+.fact dd{margin:0; font:400 14px/1.4 var(--mono); color:var(--fg); word-break:break-word}
+.fact dd a{color:var(--gold)}
+
+/* ── checks ───────────────────────────────────────────────── */
+.checks{display:flex; flex-direction:column; gap:0; border-top:1px solid var(--line)}
+.check{display:grid; grid-template-columns:28px 1fr; gap:0 16px; padding:20px 0; border-bottom:1px solid var(--line)}
+.dot{
+  width:11px; height:11px; border-radius:50%; margin-top:7px; margin-left:8px;
+  background:var(--wait); flex:none; transition:background .3s;
+}
+.check[data-state="pass"] .dot{background:var(--pass)}
+.check[data-state="fail"] .dot{background:var(--fail)}
+.check[data-state="skip"] .dot{background:transparent; border:1px solid var(--faint)}
+.check[data-state="busy"] .dot{animation:pulse 1.1s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:.25}50%{opacity:1}}
+@media (prefers-reduced-motion:reduce){.check[data-state="busy"] .dot{animation:none; opacity:.6}}
+.check > div{min-width:0}   /* without this the 64-char hash widens the page */
+.check h3{margin:0; font:400 17px/1.4 var(--serif)}
+.check .says{margin:6px 0 0; color:var(--dim); font-size:14.5px}
+.check[data-state="fail"] .says{color:var(--fail)}
+.evidence{
+  margin:12px 0 0; padding:12px 14px; background:var(--bg);
+  border:1px solid var(--line); border-radius:2px;
+  font:400 12.5px/1.8 var(--mono); color:var(--dim);
+  overflow-x:auto; white-space:pre;
+}
+.evidence b{color:var(--fg); font-weight:500}
+.evidence .ok{color:var(--pass)}
+.evidence .no{color:var(--fail)}
+
+/* ── the card ─────────────────────────────────────────────── */
+figure{margin:0; display:flex; flex-direction:column; gap:12px}
+figure .frame{border:1px solid var(--line); background:#000; aspect-ratio:1; max-width:100%}
+figure .frame img{width:100%; height:100%; display:block}
+figcaption{font:400 12px/1.6 var(--mono); letter-spacing:.1em; color:var(--faint)}
+
+/* ── verdict ──────────────────────────────────────────────── */
+.notice{padding:16px 20px; border:1px solid var(--line); border-left:2px solid var(--gold);
+  border-radius:2px; background:var(--surface); display:flex; flex-direction:column; gap:6px}
+.notice strong{font:500 11px/1 var(--mono); letter-spacing:.24em; color:var(--gold)}
+.notice p{margin:0; font-size:14.5px; color:var(--dim)}
+.verdict{padding:20px; border-radius:2px; border:1px solid; display:flex; flex-direction:column; gap:8px}
+.verdict.good{border-color:#2f5a33; background:#0d170e}
+.verdict.bad{border-color:#5e2a24; background:#1a0c0a}
+.verdict strong{font:500 12px/1 var(--mono); letter-spacing:.24em}
+.verdict.good strong{color:var(--pass)}
+.verdict.bad strong{color:var(--fail)}
+.verdict p{margin:0; font-size:15px; color:var(--dim)}
+
+/* ── footer ───────────────────────────────────────────────── */
+footer{border-top:1px solid var(--line); padding-top:24px; display:flex; flex-direction:column; gap:14px}
+footer h4{margin:0; font:400 11px/1 var(--mono); letter-spacing:.24em; color:var(--faint)}
+footer p{margin:0; color:var(--dim); font-size:14.5px; max-width:62ch}
+footer a{color:var(--gold)}
+footer code{font:400 13px var(--mono); color:var(--fg)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="mark">
+    <svg width="26" height="26" viewBox="0 0 26 26" aria-hidden="true">
+      <line x1="4" y1="13" x2="22" y2="13" stroke="#f5b63c" stroke-width="1.6"/>
+      <line x1="13" y1="5" x2="13" y2="21" stroke="#f5b63c" stroke-width="1.6"/>
+      <path d="M2 2h4M2 2v4M24 2h-4M24 2v4M2 24h4M2 24v-4M24 24h-4M24 24v-4"
+            stroke="#8a8578" stroke-width="1.2" fill="none"/>
+    </svg>
+    <span>TIMESTAMPS</span>
+  </div>
+  <h1>Verify a record</h1>
+  <p class="lede">Every check below runs <b>in your browser</b>, against the public
+     dataset and the file stored on Arweave. Nothing is computed on our side, so
+     there is nothing of ours for you to trust.</p>
+</header>
+
+<div class="ask">
+<form id="f" autocomplete="off">
+  <label for="q">Record number</label>
+  <input id="q" name="q" inputmode="numeric" placeholder="Record number, e.g. 2" value="1">
+  <button type="submit" id="go">VERIFY</button>
+</form>
+<p class="hint" id="hint"><b>1 to 1031.</b> It's the number printed at the top of the card — <b>No. 0002</b> is record 2.</p>
+</div>
+
+<div id="preview" hidden></div>
+<div id="out" hidden></div>
+
+<footer>
+  <h4>WHAT THIS PROVES</h4>
+  <p>That the artwork follows from the historical record rather than being
+     attached to it afterwards, and that nothing has been altered since
+     publication.</p>
+  <h4>WHAT IT DOESN'T</h4>
+  <p>That a source is itself correct. Only reading the source can tell you that,
+     and the link is right there on every record. If you find a date that
+     disagrees with its source, please
+     <a href="https://github.com/BIMBOSTIC/timestamps-art/issues" rel="noopener">open an issue</a>
+     — a corrected record is worth more than an uncontested one.</p>
+  <h4>GOING FURTHER</h4>
+  <p>This page checks the published file against its checksum. To rebuild the
+     artwork from scratch and confirm the checksum itself, clone the generator and
+     run <code>python3 verify.py</code> — it needs nothing installed.
+     <a href="https://github.com/BIMBOSTIC/timestamps-art" rel="noopener">The code is here.</a></p>
+</footer>
+
+</div>
+
+<script>
+// ── configuration ────────────────────────────────────────────────────────────
+// Fill these in after the real 1,031 are uploaded. While ART_TX is empty the
+// page still verifies the record and the seed, and says plainly that the
+// artwork is not published yet rather than pretending to check it.
+// Paste the manifest ID here AFTER re-uploading the corrected svg/ folder.
+// The earlier upload (1YMQhISSg-Creol…) holds art built from the old dataset and
+// will not match CHECKSUMS.txt — pointing at it shows ten honest failures.
+const ART_TX     = "RmLPFaq1yb9HuuBUfE3CkJ0rgNpQo3MMnxlOtaDgvM0";
+const ART_PREFIX = "svg/";             // "" if your manifest has no folder prefix
+const GATEWAY    = "https://arweave.net/";
+const CONTRACT   = "";                 // for the marketplace link, once deployed
+const CHAIN      = "ethereum";
+
+// Preview mode. While only part of the collection is on Arweave, map each
+// published RECORD number to the FILENAME it was uploaded under. Leave it empty
+// ({}) for the real collection, where record number, token id and filename are
+// all the same number and no mapping is needed.
+const ART_MAP = {
+  1:1, 2:2, 516:3, 578:4, 189:5, 97:6, 141:7, 341:8, 932:9, 254:10
+};
+const PREVIEW = Object.keys(ART_MAP).length > 0;
+const fileFor = n => PREVIEW ? ART_MAP[n] : n;
+
+const GRAILS = new Set([2,4,6,13,19,97,166,168,442,516,539,578,600,617,806]);
+const TOTAL  = 1031;
+
+// ── helpers ──────────────────────────────────────────────────────────────────
+const $ = (s,r=document)=>r.querySelector(s);
+if(PREVIEW && ART_TX){
+  const el=document.getElementById("preview"); el.hidden=false;
+  el.innerHTML = `<div class="notice"><strong>PREVIEW</strong><p>${Object.keys(ART_MAP).length} of the ${TOTAL} records are published to Arweave so far. Everything else on this page works for all ${TOTAL}.</p></div>`;
+}
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+async function sha256(input){
+  const buf = typeof input === "string" ? new TextEncoder().encode(input) : input;
+  const d = await crypto.subtle.digest("SHA-256", buf);
+  return [...new Uint8Array(d)].map(b=>b.toString(16).padStart(2,"0")).join("");
+}
+
+// Minimal RFC-4180 CSV reader — the summaries contain commas inside quotes.
+function parseCSV(text){
+  const rows=[]; let row=[], cell="", q=false;
+  for(let i=0;i<text.length;i++){
+    const c=text[i];
+    if(q){
+      if(c==='"'){ if(text[i+1]==='"'){cell+='"';i++;} else q=false; }
+      else cell+=c;
+    } else if(c==='"') q=true;
+    else if(c===","){ row.push(cell); cell=""; }
+    else if(c==="\n"){ row.push(cell); rows.push(row); row=[]; cell=""; }
+    else if(c!=="\r") cell+=c;
+  }
+  if(cell||row.length){ row.push(cell); rows.push(row); }
+  const head=rows.shift();
+  return rows.filter(r=>r.length>1).map(r=>Object.fromEntries(head.map((h,i)=>[h,r[i]??""])));
+}
+
+let DATA=null, SUMS=null;
+async function dataset(){
+  if(!DATA) DATA = parseCSV(await (await fetch("data/collection.csv")).text());
+  return DATA;
+}
+async function checksums(){
+  if(!SUMS){
+    const t = await (await fetch("CHECKSUMS.txt")).text();
+    SUMS = new Map();
+    for(const line of t.split("\n")){
+      const m = line.trim().match(/^([0-9a-f]{64})\s+(\d+)\.svg$/);
+      if(m) SUMS.set(parseInt(m[2],10), m[1]);
+    }
+  }
+  return SUMS;
+}
+
+// ── rendering ────────────────────────────────────────────────────────────────
+function check(id,title){
+  return `<div class="check" id="${id}" data-state="busy">
+            <div class="dot"></div>
+            <div><h3>${title}</h3><p class="says">Checking…</p></div>
+          </div>`;
+}
+function settle(id,state,says,evidence){
+  const el=$("#"+id); if(!el) return;
+  el.dataset.state=state;
+  $(".says",el).innerHTML=says;
+  if(evidence){
+    const pre=document.createElement("div");
+    pre.className="evidence"; pre.innerHTML=evidence;
+    $(".says",el).after(pre);
+  }
+}
+
+async function run(n){
+  const out=$("#out"); out.hidden=false;
+  out.innerHTML=`<div class="checks">
+      ${check("c1","The record exists in the public dataset")}
+      ${check("c2","The art seed follows from the record")}
+      ${check("c3","The artwork matches its published checksum")}
+      ${check("c4","The file stored on Arweave is that same file")}
+    </div><div id="art"></div><div id="verdict"></div>`;
+
+  let rec=null, fails=0, skipped=0;
+
+  // 1 — the record
+  try{
+    const rows=await dataset();
+    rec=rows.find(r=>parseInt(r.id,10)===n);
+    if(!rec){ settle("c1","fail",`No record numbered ${n}. The collection runs 1 to ${TOTAL}.`); return done(0,1,0); }
+    const src = rec.source_url
+      ? `<a href="${esc(rec.source_url)}" rel="noopener">${esc(rec.source)}&nbsp;→</a>`
+      : `${esc(rec.source)} <span style="color:var(--faint)">(compiled from public record)</span>`;
+    settle("c1","pass",`Found, and it carries a source you can read yourself.`);
+    $("#out").insertAdjacentHTML("afterbegin",
+      `<div class="record">
+         <div class="record-top"><span>No. ${String(n).padStart(4,"0")}</span>
+           <span class="era">${esc(rec.era.replace(/ Era.*/,"").toUpperCase())} · ${esc(rec.year)}</span></div>
+         <div class="record-body">
+           <h2>${esc(rec.title)}</h2>
+           <p>${esc(rec.summary)}</p>
+           <dl class="facts">
+             <div class="fact"><dt>DATE OF RECORD</dt><dd>${esc(rec.date)}</dd></div>
+             <div class="fact"><dt>CLASSIFICATION</dt><dd>${esc(rec.category)}</dd></div>
+             <div class="fact"><dt>TIER</dt><dd>${esc(rec.tier)}</dd></div>
+             <div class="fact"><dt>SOURCE</dt><dd>${src}</dd></div>
+           </dl>
+         </div>
+       </div>`);
+  }catch(e){
+    settle("c1","fail","Couldn't load the dataset. Reload, or check your connection.");
+    return done(0,1,0);
+  }
+
+  // 2 — the seed
+  const seedInput = `${rec.date}|${rec.title}`;
+  const seed = await sha256(seedInput);
+  if(GRAILS.has(n)){
+    settle("c2","skip",
+      `This one is a <b>composed plate</b> — hand-drawn for this event, not computed from a seed. Fifteen of the 1,031 are. It is checked by checksum instead, below.`);
+    skipped++;
+  }else{
+    settle("c2","pass",
+      `Every visual choice on this card comes from this one number.`,
+      `sha256( <b>${esc(seedInput)}</b> )\n       = <b>${seed}</b>`);
+  }
+
+  // 3 — the published checksum
+  let want=null;
+  try{
+    want=(await checksums()).get(n);
+    if(!want){ settle("c3","fail","No checksum published for this record."); fails++; }
+    else settle("c3","pass",
+      `The generator's output for this record is pinned to a published hash.`,
+      `expected  <b>${want}</b>`);
+  }catch(e){ settle("c3","fail","Couldn't load CHECKSUMS.txt."); fails++; }
+
+  // 4 — the live file
+  if(!ART_TX){
+    settle("c4","skip",
+      `The artwork isn't published to Arweave yet. This page will compare the stored file byte for byte once it is.`);
+    skipped++;
+  }else if(PREVIEW && !fileFor(n)){
+    settle("c4","skip",
+      `This record's artwork isn't published yet — ${Object.keys(ART_MAP).length} of the ${TOTAL} are up so far. The three checks above don't depend on it.`);
+    skipped++;
+  }else if(want){
+    const url = `${GATEWAY}${ART_TX}/${ART_PREFIX}${fileFor(n)}.svg`;
+    try{
+      const r = await fetch(url);
+      if(!r.ok) throw new Error(r.status);
+      const bytes = await r.arrayBuffer();
+      const got = await sha256(bytes);
+      const ok = got === want;
+      if(ok) settle("c4","pass",
+        `The file on Arweave is byte-for-byte the published artwork. Nothing has been swapped since mint.`,
+        `stored    <b class="ok">${got}</b>`);
+      else { fails++; settle("c4","fail",
+        `The stored file does not match the published checksum. This is worth reporting.`,
+        `expected  <b>${want}</b>\nstored    <b class="no">${got}</b>`); }
+      const blob = new Blob([bytes],{type:"image/svg+xml"});
+      $("#art").innerHTML =
+        `<figure><div class="frame"><img alt="Record ${n}" src="${URL.createObjectURL(blob)}"></div>
+         <figcaption>THE FILE FETCHED FROM ARWEAVE, RENDERED HERE</figcaption></figure>`;
+    }catch(e){
+      settle("c4","fail",`Couldn't fetch the file from Arweave (${esc(e.message)}). Gateways are occasionally slow — try again in a minute.`);
+      fails++;
+    }
+  }
+  done(0,fails,skipped);
+}
+
+function done(_,fails,skipped){
+  const v=$("#verdict"); if(!v) return;
+  if(fails) v.innerHTML=`<div class="verdict bad"><strong>SOMETHING DOESN'T MATCH</strong>
+    <p>One of the checks failed. That's worth knowing about — please
+    <a href="https://github.com/BIMBOSTIC/timestamps-art/issues" rel="noopener" style="color:var(--gold)">open an issue</a>
+    with the record number and what you saw. Don't take anyone's word that it's nothing, including ours.</p></div>`;
+  else v.innerHTML=`<div class="verdict good"><strong>EVERYTHING CHECKS OUT</strong>
+    <p>${skipped ? "Every check that can run right now passed." : "Every check passed."}
+    You verified this yourself — the arithmetic happened in your browser, not on our server.</p></div>`;
+}
+
+// ── wiring ───────────────────────────────────────────────────────────────────
+$("#f").addEventListener("submit", async e=>{
+  e.preventDefault();
+  const raw=$("#q").value.trim();
+  const n=parseInt(raw.replace(/^No\.?\s*/i,"").replace(/\D+/g,""),10);
+  if(!n||n<1||n>TOTAL){ $("#hint").innerHTML=`<b>Enter a number from 1 to ${TOTAL}.</b>`; return; }
+  $("#go").disabled=true; $("#go").textContent="CHECKING";
+  try{ await run(n); } finally { $("#go").disabled=false; $("#go").textContent="VERIFY"; }
+});
+// open on a real record so the page shows what it does, not an empty shell
+$("#f").dispatchEvent(new Event("submit"));
+</script>
+</body>
+</html>

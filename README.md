@@ -8,6 +8,14 @@ Most NFT collections invent their lore. This one didn't. The dataset was compile
 
 ---
 
+> **Own a token and want to check it?**
+> **[Verify it in your browser →](https://bimbostic.github.io/timestamps-art/verify.html)**
+> — no terminal, no download. The checks run on your machine, not a server.
+> For the long way round, including rebuilding the art yourself, see
+> **[VERIFYING.md](VERIFYING.md)**
+> walks through it from a collector's point of view, in four levels, starting
+> with one that needs no tools at all.
+
 ## Check a token yourself
 
 No installation. No dependencies. Python 3.9 or newer, standard library only.
